@@ -2,6 +2,7 @@
 /// line.
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:english_words/english_words.dart';
 
 
@@ -116,13 +117,13 @@ void main() => runApp(MyApp());
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return CupertinoApp(
       title: '2020 Primary Polls',
-      home: Scaffold(
-      appBar: AppBar(
-        title: Text('2020 Primary Polls'),
+      home: CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('2020 Primary Polls'),
       ),
-      body: new ScatterPlotComboLineChart.withSampleData(),
+      child: new ScatterPlotComboLineChart.withSampleData(),
     )
     );
   }
