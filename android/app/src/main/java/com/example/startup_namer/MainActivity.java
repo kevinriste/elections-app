@@ -1,4 +1,4 @@
-package com.example.startup_namer;
+package com.example.elections_app;
 
 import android.os.Bundle;
 import io.flutter.app.FlutterActivity;

@@ -1,4 +1,4 @@
-# startup_namer
+# elections_app
 
 A new Flutter project.
 
