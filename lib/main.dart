@@ -1,7 +1,7 @@
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:flutter/material.dart';
 import 'dart:io';
-//import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
 class ScatterPlotComboLineChart extends StatelessWidget {
@@ -11,9 +11,9 @@ class ScatterPlotComboLineChart extends StatelessWidget {
   ScatterPlotComboLineChart(this.seriesList, {this.animate});
 
   /// Creates a [ScatterPlotChart]
-  factory ScatterPlotComboLineChart.withElectionsData() {
+  factory ScatterPlotComboLineChart.withElectionsData(List<charts.Series<ScatterPolls, DateTime>> data) {
     return new ScatterPlotComboLineChart(
-      _getPollData(),
+      data,
       animate: true,
     );
   }
@@ -41,18 +41,29 @@ class ScatterPlotComboLineChart extends StatelessWidget {
               layoutPaintOrder: charts.LayoutViewPaintOrder.point + 1)
         ]);
   }
+}
 
-  /// Create one series with sample hard coded data.
-  static List<charts.Series<ScatterPolls, DateTime>> _getPollData() {
+
+
+/// Create one series with sample hard coded data.
+Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
     var polls = new List<PollDatum>();
     //var pollsterRatings = new List<String>();
     final pollScatterData = new List<ScatterPolls>();
     var seriesToReturn = new List<charts.Series<ScatterPolls, DateTime>>();
-  final List<String> selectedCandidates = ["Biden"
-  ,"Sanders","Warren","Harris","Buttigieg","O'Rourke","Booker"];
+    final List<String> selectedCandidates = [
+      "Biden",
+      "Sanders",
+      "Warren",
+      "Harris",
+      "Buttigieg",
+      "O'Rourke",
+      "Booker"
+    ];
+    var firstLine = 0;
 
     HttpClient client = new HttpClient();
-    client
+    await client
         .getUrl(Uri.parse(
             "https://projects.fivethirtyeight.com/polls-page/president_primary_polls.csv"))
         .then((HttpClientRequest request) {
@@ -62,41 +73,47 @@ class ScatterPlotComboLineChart extends StatelessWidget {
           .transform(utf8.decoder) // Decode bytes to UTF-8.
           .transform(new LineSplitter()) // Convert stream to individual lines.
           .listen((String line) {
-        // Process results.
-        print(line);
-        line = line.replaceAll(", "," ");
-        line = line.replaceAll(",PARTY_ID","PARTY_ID");
-        line = line.replaceAll("52,143","52 143");
-        print(line);
+        if (firstLine == 0)
+          firstLine = 1;
+        else {
+          // Process results.
+          //print(line);
+          line = line.replaceAll(", ", " ");
+          line = line.replaceAll(",PARTY_ID", "PARTY_ID");
+          line = line.replaceAll("52,143", "52 143");
+          //print(line);
 
-        List row = line.split(','); // split by comma
+          List row = line.split(','); // split by comma
 
-        int questionId = int.parse(row[0]);
-        String state = row[3];
-        String pollster = row[5];
-        int sampleSize = int.parse(row[12]);
-        List dateParts = row[17].split('/');
-        DateTime startDate = new DateTime.utc(2000 + int.parse(dateParts[2]), int.parse(dateParts[0]), int.parse(dateParts[1]));
-        dateParts = row[18].split('/');
-        DateTime endDate = new DateTime.utc(2000 + int.parse(dateParts[2]), int.parse(dateParts[0]), int.parse(dateParts[1]));
-        String party = row[28];
-        String answer = row[29];
-        double pct = double.parse(row[31]);
+          int questionId = int.parse(row[0]);
+          String state = row[3];
+          String pollster = row[5];
+          int sampleSize = int.parse(row[12]);
+          List dateParts = row[17].split('/');
+          DateTime startDate = new DateTime.utc(2000 + int.parse(dateParts[2]),
+              int.parse(dateParts[0]), int.parse(dateParts[1]));
+          dateParts = row[18].split('/');
+          DateTime endDate = new DateTime.utc(2000 + int.parse(dateParts[2]),
+              int.parse(dateParts[0]), int.parse(dateParts[1]));
+          String party = row[28];
+          String answer = row[29];
+          double pct = double.parse(row[31]);
+          
+          //print(questionId);
+          //print(state);
+          //print(pollster);
+          //print(sampleSize);
+          //print(startDate);
+          //print(endDate);
+          //print(party);
+          //print(answer);
+          //print(pct);
 
-        print(questionId);
-        print(state);
-        print(pollster);
-        print(sampleSize);
-        print(startDate);
-        print(endDate);
-        print(party);
-        print(answer);
-        print(pct);
+          polls.add(new PollDatum(questionId, state, pollster, sampleSize,
+              startDate, endDate, party, answer, pct));
 
-        polls.add(new PollDatum(questionId, state, pollster, sampleSize,
-            startDate, endDate, party, answer, pct));
-
-        pollScatterData.add(new ScatterPolls(startDate, pct, answer));
+          pollScatterData.add(new ScatterPolls(startDate, pct, answer));
+        }
       }, onDone: () {
         print('File is now closed.');
       }, onError: (e) {
@@ -104,22 +121,33 @@ class ScatterPlotComboLineChart extends StatelessWidget {
       });
     });
 
-    selectedCandidates.forEach((candidate) => 
-    seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
-        id: candidate + ' Polls',
-        domainFn: (ScatterPolls polls, _) => polls.pollDate,
-        measureFn: (ScatterPolls polls, _) => polls.result,
-        data: pollScatterData.where((poll) => poll.answer == candidate).toList(),
-      ))
-    );
+    print(pollScatterData.length);
 
+    selectedCandidates.forEach((candidate) =>
+        seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
+          id: candidate.substring(0, 1),
+          domainFn: (ScatterPolls polls, _) => polls.pollDate,
+          measureFn: (ScatterPolls polls, _) => polls.result,
+          data: pollScatterData
+              .where((poll) => poll.answer == candidate)
+              .toList(),
+        )));
+
+    selectedCandidates.forEach((candidate) { 
+      print(candidate);
+      print(pollScatterData
+          .where((poll) => poll.answer == candidate)
+          .toList()
+          .length);
+    });
+/* 
     seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
         id: 'Biden Polls',
         domainFn: (ScatterPolls polls, _) => polls.pollDate,
         measureFn: (ScatterPolls polls, _) => polls.result,
         data: pollScatterData,
-      ));
-
+      )); */
+/* 
     var pollLineData = [
       new ScatterPolls(new DateTime.utc(2018, 11, 9), 5, "Biden"),
       new ScatterPolls(new DateTime.utc(2019, 2, 20), 15, "Biden"),
@@ -127,16 +155,15 @@ class ScatterPlotComboLineChart extends StatelessWidget {
     ];
 
     seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
-          id: 'Biden Daily Average',
-          domainFn: (ScatterPolls polls, _) => polls.pollDate,
-          measureFn: (ScatterPolls polls, _) => polls.result,
-          data: pollLineData)
-        // Configure our custom line renderer for this series.
-        ..setAttribute(charts.rendererIdKey, 'customLine'));
+        id: 'B2',
+        domainFn: (ScatterPolls polls, _) => polls.pollDate,
+        measureFn: (ScatterPolls polls, _) => polls.result,
+        data: pollLineData)
+      // Configure our custom line renderer for this series.
+      ..setAttribute(charts.rendererIdKey, 'customLine')); */
 
     return seriesToReturn;
   }
-}
 
 /// Sample linear data type.
 class ScatterPolls {
@@ -168,13 +195,14 @@ void main() => runApp(ElectionsApp());
 class ElectionsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    List<charts.Series<ScatterPolls, DateTime>> data = await getPollData();
     return MaterialApp(
         title: '2020 Primary Polls',
         home: Scaffold(
           appBar: AppBar(
             title: Text('2020 Primary Polls'),
           ),
-          body: new ScatterPlotComboLineChart.withElectionsData(),
+          body: new ScatterPlotComboLineChart.withElectionsData(data),
         ));
   }
 }
