@@ -63,7 +63,7 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
     var firstLine = 0;
 
     HttpClient client = new HttpClient();
-    await client
+    return await client
         .getUrl(Uri.parse(
             "https://projects.fivethirtyeight.com/polls-page/president_primary_polls.csv"))
         .then((HttpClientRequest request) {
@@ -116,10 +116,6 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
         }
       }, onDone: () {
         print('File is now closed.');
-      }, onError: (e) {
-        print(e.toString());
-      });
-    });
 
     print(pollScatterData.length);
 
@@ -139,6 +135,13 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
           .where((poll) => poll.answer == candidate)
           .toList()
           .length);
+    
+    return seriesToReturn;
+    
+    });
+      }, onError: (e) {
+        print(e.toString());
+      });
     });
 /* 
     seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
@@ -161,8 +164,6 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
         data: pollLineData)
       // Configure our custom line renderer for this series.
       ..setAttribute(charts.rendererIdKey, 'customLine')); */
-
-    return seriesToReturn;
   }
 
 /// Sample linear data type.
@@ -192,17 +193,47 @@ class PollDatum {
 
 void main() => runApp(ElectionsApp());
 
-class ElectionsApp extends StatelessWidget {
+class ElectionsApp extends StatefulWidget {
+    @override
+    State createState() => new ElectionsAppState();
+}
+
+class ElectionsAppState extends State<ElectionsApp> {
+    var _result;
+
+  @override
+    void initState() {
+      super.initState();
+        // This is the proper place to make the async calls
+        // This way they only get called once
+
+        // During development, if you change this code,
+        // you will need to do a full restart instead of just a hot reload
+        
+        // You can't use async/await here,
+        // We can't mark this method as async because of the @override
+        getPollData().then((result) {
+            // If we need to rebuild the widget with the resulting data,
+            // make sure to use `setState`
+            setState(() {
+                _result = result;
+            });
+        });
+    }
+
   @override
   Widget build(BuildContext context) {
-    List<charts.Series<ScatterPolls, DateTime>> data = await getPollData();
+        if (_result == null) {
+            // This is what we show while we're loading
+            return new Container();
+        }
     return MaterialApp(
         title: '2020 Primary Polls',
         home: Scaffold(
           appBar: AppBar(
             title: Text('2020 Primary Polls'),
           ),
-          body: new ScatterPlotComboLineChart.withElectionsData(data),
+          body: new ScatterPlotComboLineChart.withElectionsData(_result),
         ));
   }
 }
