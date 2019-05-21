@@ -10,37 +10,21 @@ class ScatterPlotComboLineChart extends StatefulWidget {
 }
 
 class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
-  List<charts.Series> seriesList;
   bool animate = true;
-
-  @override
-    void initState() {
-      super.initState();
-        // This is the proper place to make the async calls
-        // This way they only get called once
-
-        // During development, if you change this code,
-        // you will need to do a full restart instead of just a hot reload
-        
-        // You can't use async/await here,
-        // We can't mark this method as async because of the @override
-        getPollData().then((result) {
-          print(result);
-            // If we need to rebuild the widget with the resulting data,
-            // make sure to use `setState`
-            setState(() {
-                seriesList = result;
-            });
-        });
-    }
+  Future<List<charts.Series<ScatterPolls, DateTime>>> _seriesList = getPollData();
 
   @override
   Widget build(BuildContext context) {
-        if (seriesList == null) {
-            // This is what we show while we're loading
-            return new Container();
-        }
-    return new charts.TimeSeriesChart(seriesList,
+    return new FutureBuilder(future: _seriesList,
+    builder: (BuildContext context,
+              AsyncSnapshot<List<charts.Series<ScatterPolls, DateTime>>> feedState) {
+      if (feedState.error != null) {
+        print(feedState.error);
+      }
+      if (feedState.data == null) {
+        return new Center(child: new CircularProgressIndicator());
+      }
+      return new charts.TimeSeriesChart(feedState.data,
         animate: animate,
         behaviors: [new charts.SeriesLegend()],
         // Configure the default renderer as a point renderer. This will be used
@@ -60,6 +44,7 @@ class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
               // top of those drawn by a line renderer.
               layoutPaintOrder: charts.LayoutViewPaintOrder.point + 1)
         ]);
+    });
   }
 }
 
@@ -88,20 +73,18 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
             "https://projects.fivethirtyeight.com/polls-page/president_primary_polls.csv"))
         .then((HttpClientRequest request) {
       return request.close();
-    }).then((HttpClientResponse response) {
-      response
+    }).then((HttpClientResponse response) async {
+      var lines = response
           .transform(utf8.decoder) // Decode bytes to UTF-8.
-          .transform(new LineSplitter()) // Convert stream to individual lines.
-          .listen((String line) {
+          .transform(new LineSplitter()); // Convert stream to individual lines.
+      await for(String line in lines) {
         if (firstLine == 0)
           firstLine = 1;
         else {
           // Process results.
-          //print(line);
           line = line.replaceAll(", ", " ");
           line = line.replaceAll(",PARTY_ID", "PARTY_ID");
           line = line.replaceAll("52,143", "52 143");
-          //print(line);
 
           List row = line.split(','); // split by comma
 
@@ -118,28 +101,17 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
           String party = row[28];
           String answer = row[29];
           double pct = double.parse(row[31]);
-          
-          //print(questionId);
-          //print(state);
-          //print(pollster);
-          //print(sampleSize);
-          //print(startDate);
-          //print(endDate);
-          //print(party);
-          //print(answer);
-          //print(pct);
 
           polls.add(new PollDatum(questionId, state, pollster, sampleSize,
               startDate, endDate, party, answer, pct));
 
           pollScatterData.add(new ScatterPolls(startDate, pct, answer));
         }
-      }, onDone: () {
-        print('File is now closed.');
+      }
+      
+      print('File is now closed.');
 
-    print(pollScatterData.length);
-
-    selectedCandidates.forEach((candidate) =>
+      for (String candidate in selectedCandidates) {
         seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
           id: candidate.substring(0, 1),
           domainFn: (ScatterPolls polls, _) => polls.pollDate,
@@ -147,43 +119,10 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
           data: pollScatterData
               .where((poll) => poll.answer == candidate)
               .toList(),
-        )));
-
-    selectedCandidates.forEach((candidate) { 
-      print(candidate);
-      print(pollScatterData
-          .where((poll) => poll.answer == candidate)
-          .toList()
-          .length);
-    
-    return seriesToReturn;
-    
+        ));
+      }
+      return seriesToReturn;
     });
-      }, onError: (e) {
-        print(e.toString());
-      });
-    });
-/* 
-    seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
-        id: 'Biden Polls',
-        domainFn: (ScatterPolls polls, _) => polls.pollDate,
-        measureFn: (ScatterPolls polls, _) => polls.result,
-        data: pollScatterData,
-      )); */
-/* 
-    var pollLineData = [
-      new ScatterPolls(new DateTime.utc(2018, 11, 9), 5, "Biden"),
-      new ScatterPolls(new DateTime.utc(2019, 2, 20), 15, "Biden"),
-      new ScatterPolls(new DateTime.utc(2019, 5, 10), 240, "Biden"),
-    ];
-
-    seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
-        id: 'B2',
-        domainFn: (ScatterPolls polls, _) => polls.pollDate,
-        measureFn: (ScatterPolls polls, _) => polls.result,
-        data: pollLineData)
-      // Configure our custom line renderer for this series.
-      ..setAttribute(charts.rendererIdKey, 'customLine')); */
   }
 
 /// Sample linear data type.
@@ -213,13 +152,7 @@ class PollDatum {
 
 void main() => runApp(ElectionsApp());
 
-class ElectionsApp extends StatefulWidget {
-    @override
-    State createState() => new ElectionsAppState();
-}
-
-class ElectionsAppState extends State<ElectionsApp> {
-
+class ElectionsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
