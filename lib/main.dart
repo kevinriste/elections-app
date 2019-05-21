@@ -26,7 +26,36 @@ class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
       }
       return new charts.TimeSeriesChart(feedState.data,
         animate: animate,
-        behaviors: [new charts.SeriesLegend()],
+        behaviors: [new charts.SeriesLegend(
+          // Positions for "start" and "end" will be left and right respectively
+          // for widgets with a build context that has directionality ltr.
+          // For rtl, "start" and "end" will be right and left respectively.
+          // Since this example has directionality of ltr, the legend is
+          // positioned on the right side of the chart.
+          //position: charts.BehaviorPosition.start,
+          // For a legend that is positioned on the left or right of the chart,
+          // setting the justification for [endDrawArea] is aligned to the
+          // bottom of the chart draw area.
+          outsideJustification: charts.OutsideJustification.startDrawArea,
+          // For a legend that is positioned on the left or right of the chart,
+          // setting the justification for [endDrawArea] is aligned to the
+          // bottom of the chart draw area.
+          insideJustification: charts.InsideJustification.topStart,
+          // By default, if the position of the chart is on the left or right of
+          // the chart, [horizontalFirst] is set to false. This means that the
+          // legend entries will grow as new rows first instead of a new column.
+          horizontalFirst: false,
+          // By setting this value to 2, the legend entries will grow up to two
+          // rows before adding a new column.
+          desiredMaxRows: 2,
+          // This defines the padding around each legend entry.
+          //cellPadding: new EdgeInsets.only(right: 4.0, bottom: 4.0),
+          // Render the legend entry text with custom styles.
+          entryTextStyle: charts.TextStyleSpec(
+              //color: charts.Color(r: 127, g: 63, b: 191),
+              fontFamily: 'Arial',
+              fontSize: 14),
+        )],
         // Configure the default renderer as a point renderer. This will be used
         // for any series that does not define a rendererIdKey.
         //
@@ -43,7 +72,10 @@ class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
               // By default, series drawn by the point renderer are painted on
               // top of those drawn by a line renderer.
               layoutPaintOrder: charts.LayoutViewPaintOrder.point + 1)
-        ]);
+        ],
+        primaryMeasureAxis: new charts.PercentAxisSpec(
+          viewport: new charts.NumericExtents(0.0, 0.5)
+        ));
     });
   }
 }
@@ -100,7 +132,7 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
               int.parse(dateParts[0]), int.parse(dateParts[1]));
           String party = row[28];
           String answer = row[29];
-          double pct = double.parse(row[31]);
+          double pct = double.parse(row[31])/100;
 
           polls.add(new PollDatum(questionId, state, pollster, sampleSize,
               startDate, endDate, party, answer, pct));
@@ -113,7 +145,7 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
 
       for (String candidate in selectedCandidates) {
         seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
-          id: candidate.substring(0, 1),
+          id: candidate,
           domainFn: (ScatterPolls polls, _) => polls.pollDate,
           measureFn: (ScatterPolls polls, _) => polls.result,
           data: pollScatterData
