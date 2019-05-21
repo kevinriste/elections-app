@@ -4,22 +4,42 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 
-class ScatterPlotComboLineChart extends StatelessWidget {
-  final List<charts.Series> seriesList;
-  final bool animate;
+class ScatterPlotComboLineChart extends StatefulWidget {
+    @override
+    State createState() => new ScatterPlotComboLineChartState();
+}
 
-  ScatterPlotComboLineChart(this.seriesList, {this.animate});
+class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
+  List<charts.Series> seriesList;
+  bool animate = true;
 
-  /// Creates a [ScatterPlotChart]
-  factory ScatterPlotComboLineChart.withElectionsData(List<charts.Series<ScatterPolls, DateTime>> data) {
-    return new ScatterPlotComboLineChart(
-      data,
-      animate: true,
-    );
-  }
+  @override
+    void initState() {
+      super.initState();
+        // This is the proper place to make the async calls
+        // This way they only get called once
+
+        // During development, if you change this code,
+        // you will need to do a full restart instead of just a hot reload
+        
+        // You can't use async/await here,
+        // We can't mark this method as async because of the @override
+        getPollData().then((result) {
+          print(result);
+            // If we need to rebuild the widget with the resulting data,
+            // make sure to use `setState`
+            setState(() {
+                seriesList = result;
+            });
+        });
+    }
 
   @override
   Widget build(BuildContext context) {
+        if (seriesList == null) {
+            // This is what we show while we're loading
+            return new Container();
+        }
     return new charts.TimeSeriesChart(seriesList,
         animate: animate,
         behaviors: [new charts.SeriesLegend()],
@@ -199,41 +219,16 @@ class ElectionsApp extends StatefulWidget {
 }
 
 class ElectionsAppState extends State<ElectionsApp> {
-    var _result;
-
-  @override
-    void initState() {
-      super.initState();
-        // This is the proper place to make the async calls
-        // This way they only get called once
-
-        // During development, if you change this code,
-        // you will need to do a full restart instead of just a hot reload
-        
-        // You can't use async/await here,
-        // We can't mark this method as async because of the @override
-        getPollData().then((result) {
-            // If we need to rebuild the widget with the resulting data,
-            // make sure to use `setState`
-            setState(() {
-                _result = result;
-            });
-        });
-    }
 
   @override
   Widget build(BuildContext context) {
-        if (_result == null) {
-            // This is what we show while we're loading
-            return new Container();
-        }
     return MaterialApp(
         title: '2020 Primary Polls',
         home: Scaffold(
           appBar: AppBar(
             title: Text('2020 Primary Polls'),
           ),
-          body: new ScatterPlotComboLineChart.withElectionsData(_result),
+          body: new ScatterPlotComboLineChart(),
         ));
   }
 }
