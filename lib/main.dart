@@ -3,30 +3,33 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 class ScatterPlotComboLineChart extends StatefulWidget {
     @override
-    State createState() => new ScatterPlotComboLineChartState();
+    State createState() => ScatterPlotComboLineChartState();
 }
 
 class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
   bool animate = true;
-  Future<List<charts.Series<ScatterPolls, DateTime>>> _seriesList = getPollData();
+  Future<CustomData> _seriesList = getPollData();
 
   @override
   Widget build(BuildContext context) {
-    return new FutureBuilder(future: _seriesList,
+    return FutureBuilder(future: _seriesList,
     builder: (BuildContext context,
-              AsyncSnapshot<List<charts.Series<ScatterPolls, DateTime>>> feedState) {
+              AsyncSnapshot<CustomData> feedState) {
       if (feedState.error != null) {
         print(feedState.error);
       }
       if (feedState.data == null) {
-        return new Center(child: new CircularProgressIndicator());
+        return Center(child: CircularProgressIndicator());
       }
-      return new charts.TimeSeriesChart(feedState.data,
+      return FractionallySizedBox(
+        heightFactor: 0.7,
+        child: charts.TimeSeriesChart(feedState.data.seriesData,
         animate: animate,
-        behaviors: [new charts.SeriesLegend(
+        behaviors: [charts.SeriesLegend(
           // Positions for "start" and "end" will be left and right respectively
           // for widgets with a build context that has directionality ltr.
           // For rtl, "start" and "end" will be right and left respectively.
@@ -36,20 +39,20 @@ class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
           // For a legend that is positioned on the left or right of the chart,
           // setting the justification for [endDrawArea] is aligned to the
           // bottom of the chart draw area.
-          outsideJustification: charts.OutsideJustification.startDrawArea,
+          //outsideJustification: charts.OutsideJustification.startDrawArea,
           // For a legend that is positioned on the left or right of the chart,
           // setting the justification for [endDrawArea] is aligned to the
           // bottom of the chart draw area.
-          insideJustification: charts.InsideJustification.topStart,
+          //insideJustification: charts.InsideJustification.topEnd,
           // By default, if the position of the chart is on the left or right of
           // the chart, [horizontalFirst] is set to false. This means that the
-          // legend entries will grow as new rows first instead of a new column.
-          horizontalFirst: false,
+          // legend entries will grow as rows first instead of a column.
+          //horizontalFirst: false,
           // By setting this value to 2, the legend entries will grow up to two
-          // rows before adding a new column.
-          desiredMaxRows: 2,
+          // rows before adding a column.
+          desiredMaxColumns: 2,
           // This defines the padding around each legend entry.
-          //cellPadding: new EdgeInsets.only(right: 4.0, bottom: 4.0),
+          //cellPadding: EdgeInsets.only(right: 4.0, bottom: 4.0),
           // Render the legend entry text with custom styles.
           entryTextStyle: charts.TextStyleSpec(
               //color: charts.Color(r: 127, g: 63, b: 191),
@@ -61,10 +64,10 @@ class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
         //
         // This is the default configuration, but is shown here for
         // illustration.
-        defaultRenderer: new charts.PointRendererConfig(),
+        defaultRenderer: charts.PointRendererConfig(),
         // Custom renderer configuration for the line series.
         customSeriesRenderers: [
-          new charts.LineRendererConfig(
+          charts.LineRendererConfig(
               // ID used to link series to this renderer.
               customRendererId: 'customLine',
               // Configure the regression line to be painted above the points.
@@ -73,34 +76,68 @@ class ScatterPlotComboLineChartState extends State<ScatterPlotComboLineChart> {
               // top of those drawn by a line renderer.
               layoutPaintOrder: charts.LayoutViewPaintOrder.point + 1)
         ],
-        primaryMeasureAxis: new charts.PercentAxisSpec(
-          viewport: new charts.NumericExtents(0.0, 0.5)
-        ));
-    });
-  }
+        primaryMeasureAxis: charts.PercentAxisSpec(
+            tickProviderSpec:
+                charts.StaticNumericTickProviderSpec([
+                 charts.TickSpec(0.0)
+                ,charts.TickSpec(0.1)
+                ,charts.TickSpec(0.2)
+                ,charts.TickSpec(0.3)
+                ,charts.TickSpec(0.4)
+                ,charts.TickSpec(0.5)
+                ,charts.TickSpec(0.6)
+                ,charts.TickSpec(0.7)
+                ,charts.TickSpec(0.8)
+                ,charts.TickSpec(0.9)
+                ,charts.TickSpec(1.0)
+                ]),
+          viewport: charts.NumericExtents(0.0, feedState.data.topPct)
+        ))
+    );
+  });
+}
 }
 
-
-
-/// Create one series with sample hard coded data.
-Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
-    var polls = new List<PollDatum>();
-    //var pollsterRatings = new List<String>();
-    final pollScatterData = new List<ScatterPolls>();
-    var seriesToReturn = new List<charts.Series<ScatterPolls, DateTime>>();
-    final List<String> selectedCandidates = [
-      "Biden",
-      "Sanders",
-      "Warren",
-      "Harris",
-      "Buttigieg",
-      "O'Rourke",
-      "Booker"
-    ];
+Future<CustomData> getPollData() async {
+    var polls = List<PollDatum>();
+    var pollsterRatings = List<PollsterRating>();
+    final pollScatterData = List<ScatterPolls>();
+    var seriesToReturn = List<charts.Series<ScatterPolls, DateTime>>();
     var firstLine = 0;
 
-    HttpClient client = new HttpClient();
-    return await client
+    HttpClient client = HttpClient();
+
+    await client
+        .getUrl(Uri.parse(
+            "https://raw.githubusercontent.com/fivethirtyeight/data/master/pollster-ratings/pollster-ratings.csv"))
+        .then((HttpClientRequest request) {
+      return request.close();
+    }).then((HttpClientResponse response) async {
+      var lines = response
+          .transform(utf8.decoder) // Decode bytes to UTF-8.
+          .transform(LineSplitter()); // Convert stream to individual lines.
+      await for(String line in lines) {
+        if (firstLine == 0)
+          firstLine = 1;
+        else {
+          // Process results.
+          line = line.replaceAll(RegExp(r'(?!(([^"]*"){2})*[^"]*$),'), '');
+
+          List row = line.split(','); // split by comma
+
+          String pollster = row[0];
+          double plusMinus = double.parse(row[7]);
+
+          pollsterRatings.add(PollsterRating(pollster, plusMinus));
+        }
+      }
+      
+      print('File 1 is now closed.');
+    });
+
+    firstLine = 0;
+
+    await client
         .getUrl(Uri.parse(
             "https://projects.fivethirtyeight.com/polls-page/president_primary_polls.csv"))
         .then((HttpClientRequest request) {
@@ -108,15 +145,13 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
     }).then((HttpClientResponse response) async {
       var lines = response
           .transform(utf8.decoder) // Decode bytes to UTF-8.
-          .transform(new LineSplitter()); // Convert stream to individual lines.
+          .transform(LineSplitter()); // Convert stream to individual lines.
       await for(String line in lines) {
         if (firstLine == 0)
           firstLine = 1;
         else {
           // Process results.
-          line = line.replaceAll(", ", " ");
-          line = line.replaceAll(",PARTY_ID", "PARTY_ID");
-          line = line.replaceAll("52,143", "52 143");
+          line = line.replaceAll(RegExp(r'(?!(([^"]*"){2})*[^"]*$),'), '');
 
           List row = line.split(','); // split by comma
 
@@ -125,39 +160,70 @@ Future<List<charts.Series<ScatterPolls, DateTime>>> getPollData() async {
           String pollster = row[5];
           int sampleSize = int.parse(row[12]);
           List dateParts = row[17].split('/');
-          DateTime startDate = new DateTime.utc(2000 + int.parse(dateParts[2]),
+          DateTime startDate = DateTime.utc(2000 + int.parse(dateParts[2]),
               int.parse(dateParts[0]), int.parse(dateParts[1]));
           dateParts = row[18].split('/');
-          DateTime endDate = new DateTime.utc(2000 + int.parse(dateParts[2]),
+          DateTime endDate = DateTime.utc(2000 + int.parse(dateParts[2]),
               int.parse(dateParts[0]), int.parse(dateParts[1]));
           String party = row[28];
           String answer = row[29];
           double pct = double.parse(row[31])/100;
+          String notes = row[25];
 
-          polls.add(new PollDatum(questionId, state, pollster, sampleSize,
-              startDate, endDate, party, answer, pct));
-
-          pollScatterData.add(new ScatterPolls(startDate, pct, answer));
+          polls.add(PollDatum(questionId, state, pollster, sampleSize,
+              startDate, endDate, party, answer, notes, pct));
         }
       }
       
-      print('File is now closed.');
-
-      for (String candidate in selectedCandidates) {
-        seriesToReturn.add(new charts.Series<ScatterPolls, DateTime>(
-          id: candidate,
-          domainFn: (ScatterPolls polls, _) => polls.pollDate,
-          measureFn: (ScatterPolls polls, _) => polls.result,
-          data: pollScatterData
-              .where((poll) => poll.answer == candidate)
-              .toList(),
-        ));
-      }
-      return seriesToReturn;
+      print('File 2 is now closed.');
     });
+
+    final bidenPolls = polls
+      .where((poll) => poll.answer == 'Biden')
+      .map((poll) => poll.questionId)
+      .toList()
+      .toSet()
+      .toList();
+
+    polls = polls
+      .where((poll) => poll.party == 'DEM'
+                    && poll.notes != "open-ended question"
+                    && poll.notes != "head-to-head poll"
+                    && bidenPolls.contains(poll.questionId))
+      .toList();
+
+    polls.forEach((poll) => pollScatterData.add(ScatterPolls(poll.startDate, poll.pct, poll.answer)));
+
+    final List<String> selectedCandidates = polls.map((poll) => poll.answer)
+                            .toList()
+                            .toSet()
+                            .take(6)
+                            .toList();
+
+    for (String candidate in selectedCandidates) {
+      seriesToReturn.add(charts.Series<ScatterPolls, DateTime>(
+        id: candidate,
+        domainFn: (ScatterPolls polls, _) => polls.pollDate,
+        measureFn: (ScatterPolls polls, _) => polls.result,
+        data: pollScatterData
+            .where((poll) => poll.answer == candidate)
+            .toList(),
+      ));
+    }
+
+    double biggestPct = (pollScatterData
+    .where((poll) => selectedCandidates.contains(poll.answer))
+    .map((poll) => poll.result)
+    .reduce(max)
+    * 10)
+    .ceilToDouble()
+    /10;
+
+    print(biggestPct);
+    
+    return CustomData(biggestPct+.01, seriesToReturn);
   }
 
-/// Sample linear data type.
 class ScatterPolls {
   final DateTime pollDate;
   final double result;
@@ -166,7 +232,13 @@ class ScatterPolls {
   ScatterPolls(this.pollDate, this.result, this.answer);
 }
 
-/// Sample linear data type.
+class CustomData {
+  final double topPct;
+  final List<charts.Series<ScatterPolls, DateTime>> seriesData;
+
+  CustomData(this.topPct, this.seriesData);
+}
+
 class PollDatum {
   final int questionId;
   final String state;
@@ -176,24 +248,71 @@ class PollDatum {
   final DateTime endDate;
   final String party;
   final String answer;
+  final String notes;
   final double pct;
 
   PollDatum(this.questionId, this.state, this.pollster, this.sampleSize,
-      this.startDate, this.endDate, this.party, this.answer, this.pct);
+      this.startDate, this.endDate, this.party, this.answer, this.notes, this.pct);
 }
 
-void main() => runApp(ElectionsApp());
+class PollsterRating {
+  final String pollster;
+  final double plusMinus;
 
-class ElectionsApp extends StatelessWidget {
+  PollsterRating(this.pollster, this.plusMinus);
+}
+
+void main() => runApp(MaterialApp(
+        title: '2020 Primary Polls',
+        home: ElectionsApp1()));
+
+class ElectionsApp1 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-        title: '2020 Primary Polls',
-        home: Scaffold(
+    return Scaffold(
           appBar: AppBar(
-            title: Text('2020 Primary Polls'),
+            title: Text('2020 Primary Polls 1'),
           ),
-          body: new ScatterPlotComboLineChart(),
-        ));
+          body: Column(
+            children: [
+                Align(
+      alignment: Alignment.topRight,
+        child: RaisedButton(
+          child: Text('Settings'),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ElectionsApp2()),
+            );
+          },
+        ),)
+              ,
+                Expanded(
+                child: Center(
+            child: ScatterPlotComboLineChart()
+          ))
+            ]
+          )
+        );
+  }
+}
+
+class ElectionsApp2 extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+          appBar: AppBar(
+            title: Text('2020 Primary Polls 2'),
+          ),
+          body: Container(
+            child: Center( 
+              child: Column(
+                children: [
+                  ScatterPlotComboLineChart()
+                ]
+              )
+            )
+          ),
+        );
   }
 }
