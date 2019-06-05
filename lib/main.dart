@@ -194,10 +194,31 @@ Future<CustomData> getPollData() async {
 
     polls.forEach((poll) => pollScatterData.add(ScatterPolls(poll.startDate, poll.pct, poll.answer)));
 
-    final List<String> selectedCandidates = polls.map((poll) => poll.answer)
+    final twoWeeksAgo = (new DateTime.now()).subtract(new Duration(days: 15));
+
+    final recentPolls = polls.where((poll) => poll.startDate.difference(twoWeeksAgo).inDays >= 0.0);
+
+    List<Candidate> availableCandidates = polls.map((poll) => poll.answer)
                             .toList()
                             .toSet()
-                            .take(6)
+                            .toList()
+                            .map((candidate) => Candidate(candidate,0.0,0.0,0.0))
+                            .toList();
+
+    availableCandidates.forEach((candidate) {
+      recentPolls.where((poll) => poll.answer == candidate.name)
+           .forEach((poll) {
+             candidate.totalPct += poll.pct;
+             candidate.count += 1.0;
+           });
+      if(candidate.count == 0) candidate.average = 0;
+      else candidate.average = candidate.totalPct / candidate.count;
+    });
+
+    availableCandidates.sort((candidate1, candidate2) => candidate2.average.compareTo(candidate1.average));
+
+    final List<String> selectedCandidates = availableCandidates.take(8)
+                            .map((candidate) => candidate.name)
                             .toList();
 
     for (String candidate in selectedCandidates) {
@@ -230,6 +251,15 @@ class ScatterPolls {
   final String answer;
 
   ScatterPolls(this.pollDate, this.result, this.answer);
+}
+
+class Candidate {
+  final String name;
+  double totalPct;
+  double count;
+  double average;
+
+  Candidate(this.name, this.totalPct, this.count, this.average);
 }
 
 class CustomData {
