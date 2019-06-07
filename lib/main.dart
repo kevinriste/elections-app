@@ -217,7 +217,7 @@ Future<CustomData> getPollData() async {
 
     availableCandidates.sort((candidate1, candidate2) => candidate2.average.compareTo(candidate1.average));
 
-    final List<String> selectedCandidates = availableCandidates.take(8)
+    final List<String> selectedCandidates = availableCandidates.take(6)
                             .map((candidate) => candidate.name)
                             .toList();
 
